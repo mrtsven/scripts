@@ -1,0 +1,136 @@
+#!/usr/bin/env bash
+
+bold=$(tput bold)
+normal=$(tput sgr0)
+green=$(tput setaf 2)
+blue=$(tput setaf 4)
+yellow=$(tput setaf 3)
+cyan=$(tput setaf 6)
+
+REPOS=("waiter" "backoffice" "api" "shared" "shared-client" "cron" "consumer")
+
+REPO=""
+SOURCE=""
+DEST=""
+STEP=1
+
+OS_TYPE="$(uname -s)"
+URL=''
+
+COPY_MODE=false
+
+function check_xclip() {
+    if command -v xclip >/dev/null 2>&1; then
+        echo "xclip is installed."
+    else
+        echo "xclip is not installed."
+        COPY_MODE=false
+    fi
+}
+
+# Parse command-line options
+while getopts "c" opt; do
+  case "$opt" in
+    c) COPY_MODE=true ;;
+    *) echo "Usage: $0 [-c]"; exit 1 ;;
+  esac
+done
+
+function end_message() {
+    if [ "$COPY_MODE" = true ]; then
+        echo -e "${green}✔${normal} URL copied to clipboard."
+    else
+        echo -e "${green}✔${normal} Opening comparison in browser..."
+    fi
+}
+
+function determine_os() {
+    case "$OS_TYPE" in
+    Darwin)
+        if [ "$COPY_MODE" = true ]; then      
+            echo -n "$URL" | pbcopy
+        else
+            open "$URL"
+        fi
+        ;;
+    Linux)
+        # Check if running under WSL
+        if grep -qi microsoft /proc/version; then
+        start "$URL"
+        else
+            check_xclip
+
+            if [ "$COPY_MODE" = true ]; then
+                echo -n "$URL" | xclip -selection clipboard
+            else
+                xdg-open "$URL"
+            fi
+        fi
+        ;;
+    CYGWIN*|MINGW*|MSYS*)
+        start "$URL"
+        ;;
+    *)
+        echo "Unknown OS: $OS_TYPE"
+        ;;
+    esac
+}
+
+
+
+# Function to render the current status line
+function render_status() {
+    clear
+    echo -e "${bold}Repo:${normal} '${cyan}${REPO}${normal}' | ${bold}Source:${normal} '${cyan}${SOURCE}${normal}' | ${bold}Dest:${normal} '${cyan}${DEST}${normal}'"
+    echo -e "${bold}Step:${normal} ${yellow}${STEP}${normal} | ${bold}Copy Mode:${normal} ${yellow}${COPY_MODE}${normal}"
+    echo ""
+}
+
+while true; do
+    render_status
+
+    case $STEP in
+        1) # Step 1: Select Repo
+            echo "Select a repository:"
+            select CHOICE in "${REPOS[@]}" "Back"; do
+                if [[ "$REPLY" -eq $((${#REPOS[@]} + 1)) ]]; then
+                    echo -e "${red}You're already at the first step.${normal}"
+                elif [[ -n "$CHOICE" ]]; then
+                    REPO="$CHOICE"
+                    STEP=2
+                    break
+                else
+                    echo -e "${red}Invalid selection. Try again.${normal}"
+                fi
+            done
+            ;;
+        2) # Step 2: Enter Source
+            read -p "Enter source branch (or type 'b' to go back): " input
+            if [[ "$input" == "b" ]]; then
+                REPO=""
+                STEP=1
+            elif [[ -n "$input" ]]; then
+                SOURCE="$input"
+                STEP=3
+            fi
+            ;;
+        3) # Step 3: Enter Dest
+            read -p "Enter destination branch (or type 'b' to go back): " input
+            if [[ "$input" == "b" ]]; then
+                SOURCE=""
+                STEP=2
+            elif [[ -n "$input" ]]; then
+                DEST="$input"
+                STEP=4
+            fi
+            ;;
+        4) # Final step: Confirm and open
+            URL="https://bitbucket.org/possys/${REPO}/branches/compare/${SOURCE}%0D${DEST}#diff"
+
+            determine_os
+            end_message
+            break
+            ;;
+    esac
+done
+
