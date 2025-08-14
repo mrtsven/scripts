@@ -42,6 +42,8 @@ function end_message() {
     else
         echo -e "${green}✔${normal} Opening comparison in browser..."
     fi
+
+    exit 0;
 }
 
 function determine_os() {
