@@ -29,10 +29,34 @@ function check_xclip() {
 }
 
 # Parse command-line options
-while getopts "c" opt; do
-  case "$opt" in
-    c) COPY_MODE=true ;;
-    *) echo "Usage: $0 [-c]"; exit 1 ;;
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -c)
+      COPY_MODE=true
+      shift
+      ;;
+    --repo=*)
+      REPO="${1#*=}"
+      shift
+      ;;
+    -*)
+      echo "Unknown option: $1"
+      echo "Usage: $0 [-c] [--repo=<name>] [source] [dest]"
+      exit 1
+      ;;
+    *)
+      # Positional arguments (commits/branches)
+      if [[ -z "$SOURCE" ]]; then
+        SOURCE="$1"
+      elif [[ -z "$DEST" ]]; then
+        DEST="$1"
+      else
+        echo "Too many arguments."
+        echo "Usage: $0 [-c] [--repo=<name>] [source] [dest]"
+        exit 1
+      fi
+      shift
+      ;;
   esac
 done
 
@@ -87,6 +111,13 @@ function render_status() {
     echo -e "${bold}Step:${normal} ${yellow}${STEP}${normal} | ${bold}Copy Mode:${normal} ${yellow}${COPY_MODE}${normal}"
     echo ""
 }
+
+# Fast mode: if repo + source + dest are all set, skip interactive mode
+if [[ -n "$REPO" && -n "$SOURCE" && -n "$DEST" ]]; then
+    URL="https://bitbucket.org/possys/${REPO}/branches/compare/${SOURCE}%0D${DEST}#diff"
+    determine_os
+    end_message
+fi
 
 while true; do
     render_status
