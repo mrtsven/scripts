@@ -28,6 +28,22 @@ function check_xclip() {
     fi
 }
 
+function validate_repo() {
+    local input_repo="$1"
+    for valid_repo in "${REPOS[@]}"; do
+        if [[ "$valid_repo" == "$input_repo" ]]; then
+            return 0
+        fi
+    done
+
+    echo -e "${yellow}⚠ Invalid repo:${normal} '$input_repo'"
+    echo "Available repositories:"
+    for r in "${REPOS[@]}"; do
+        echo "  - $r"
+    done
+    exit 1
+}
+
 # Parse command-line options
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -37,6 +53,7 @@ while [[ $# -gt 0 ]]; do
       ;;
     --repo=*)
       REPO="${1#*=}"
+      validate_repo "$REPO"
       shift
       ;;
     -*)
