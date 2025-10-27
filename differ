@@ -28,6 +28,15 @@ function check_xclip() {
     fi
 }
 
+function check_xdg_open() {
+    if command -v xdg-open >/dev/null 2>&1; then
+        echo "xdg-open is installed."
+    else
+        echo "xdg-open is not installed. Please install "xdg-utils" using your package manager and try again."
+        COPY_MODE=false
+    fi
+}
+
 function validate_repo() {
     local input_repo="$1"
     for valid_repo in "${REPOS[@]}"; do
@@ -99,13 +108,13 @@ function determine_os() {
     Linux)
         # Check if running under WSL
         if grep -qi microsoft /proc/version; then
-        start "$URL"
+        explorer.exe "$URL"
         else
-            check_xclip
-
             if [ "$COPY_MODE" = true ]; then
+                check_xclip
                 echo -n "$URL" | xclip -selection clipboard
             else
+                check_xdg_open
                 xdg-open "$URL"
             fi
         fi
