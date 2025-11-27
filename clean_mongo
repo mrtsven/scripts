@@ -1,0 +1,21 @@
+#!/bin/bash
+
+if ! command -v mongosh >/dev/null 2>&1; then
+    echo "Error: mongosh is not installed or not in PATH."
+    exit 1
+fi
+
+
+DB_NAME="mrw"
+COLLECTIONS=("payments" "orders" "bills" "billinstances" "ordersArchived" "paymentsArchived")
+
+for COL in "${COLLECTIONS[@]}"; do
+  echo "Clearing $COL..."
+  
+  # Run deleteMany and capture the "deletedCount" value
+  RESULT=$(mongosh "$DB_NAME" --quiet --eval "db.${COL}.deleteMany({}).deletedCount")
+  
+  echo "Deleted $RESULT documents from $COL"
+done
+
+echo "Done."
