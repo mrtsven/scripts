@@ -1,0 +1,57 @@
+#!/bin/bash
+
+source .env
+
+if ! command -v mongoexport >/dev/null 2>&1; then
+    echo "Error: mongoexport is not installed or not in PATH."
+    exit 1
+fi
+
+TENANT_ID="TcnNwxHCK4btKhC58"
+DB_CONNECTION=$CONNECTION
+COLLECTIONS=( 
+              'tenants'
+              'modules'
+              'integrations'
+              'vats'
+              'payment_method_groups'
+              'tenant_paymentmethods'
+              'tableplans'
+              'tables'
+              'revenueGroups'
+              'order_courses'
+              'options'
+              'option_groups'
+              'order_statuses'
+              'categories'
+              'products'
+              'productionScreens'
+              'courses'
+              'upsellers'
+              'bestsellers'
+              'salesAreas'
+              'opening_hours'
+              'reservationTypes'
+              'priceLevels'
+              'priceTimes'
+              'orderTypes'
+              'alternateCurrencies'
+              'prepositions'
+              'jobs'
+              'roles')
+
+for COL in "${COLLECTIONS[@]}"; do
+  echo "Exporting $COL..."
+
+  if [ "$COL" == "tenants" ]; then
+    QUERY='{"_id": "'$TENANT_ID'" }'
+  else
+    QUERY='{"_tenantId": "'$TENANT_ID'" }'
+  fi
+  
+  RESULT=$(mongoexport --uri "$DB_CONNECTION" --db "production" --collection "$COL" --query "$QUERY" --out "/home/sven/Documents/export/$COL.json")
+  
+  echo "Exported $RESULT documents from $COL to $COL.json"
+done
+
+echo "Done exporting."

@@ -1,0 +1,48 @@
+#!/bin/bash
+
+if ! command -v mongoimport >/dev/null 2>&1; then
+    echo "Error: mongoimport is not installed or not in PATH."
+    exit 1
+fi
+
+
+COLLECTIONS=(
+              'tenants' 
+              'modules'
+              'integrations'
+              'vats'
+              'payment_method_groups'
+              'tenant_paymentmethods'
+              'tableplans'
+              'tables'
+              'revenueGroups'
+              'order_courses'
+              'options'
+              'option_groups'
+              'order_statuses'
+              'categories'
+              'products'
+              'productionScreens'
+              'courses'
+              'upsellers'
+              'bestsellers'
+              'salesAreas'
+              'opening_hours'
+              'reservationTypes'
+              'priceLevels'
+              'priceTimes'
+              'orderTypes'
+              'alternateCurrencies'
+              'prepositions'
+              'jobs'
+              'roles')
+
+for COL in "${COLLECTIONS[@]}"; do
+  echo "Importing $COL..."
+  
+  RESULT=$(mongoimport --uri "mongodb://localhost:27017" --db "mrw" --collection "$COL" --file "/home/sven/Documents/export/$COL.json")
+  
+  echo "Imported $RESULT documents from $COL to $COL.json"
+done
+
+echo "Done importing."
