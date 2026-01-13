@@ -11,9 +11,9 @@ WINDOW_ID=$(xdotool getactivewindow);
 
 center_text() {
 	local text="$1"
-	local termiinal_width=$(tput cols)
+	local terminal_width=$(tput cols)
 	local text_width=${#text}
-	local padding=$(( ( termiinal_width - text_width ) / 2 ))
+	local padding=$(( ( terminal_width - text_width ) / 2 ))
 
 	if [ $padding -gt 0 ]; then
 		printf "%${padding}s%s\n" "" "$text"
@@ -59,16 +59,17 @@ while true; do
 
 	choice=""
 
-	COUNTER=0;
+	START_TIME=$SECONDS;
 
 	while [ -z "$choice" ]; do
 
-		SE=$((COUNTER % 60))
-		MI=$((COUNTER / 60))
-		clear
+		CURRENT_TOTAL=$(( SECONDS - START_TIME ))
+		SE=$(( CURRENT_TOTAL % 60))
+		MI=$(( CURRENT_TOTAL / 60))
 		COUNT_STRING=$(printf "\r%02d:%02d " "$MI" "$SE")
 
-		
+
+		clear;
 		echo "========="
 		echo "$COUNT_STRING"
 		echo "========="
@@ -76,18 +77,25 @@ while true; do
 		echo "1) Restart"
 		echo "2) Exit"
 
-		sleep 1;
-		((COUNTER++))
 
-		read -t 0.5 -n 1 input;
+		read -s -t 1 -n 1 input;
 
 		if [ ! -z "$input" ]; then
 			choice=$input
 
 			case $choice in
-				1) clear; choice=""; continue;;
-				2) clear; exit 0;;
-				*) choice=""; clear; echo "?";
+				1) 
+					clear; 
+					START_TIME=$SECONDS;
+					choice=""; 
+					continue;;
+				2) 
+					clear; 
+					exit 0;;
+				*) 
+					choice=""; 
+					clear; 
+					echo "?";;
 			esac
 		fi
 	done
