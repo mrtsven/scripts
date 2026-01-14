@@ -46,7 +46,7 @@ while true; do
 			center_text "$line"
 		done <<< "$FIG_OUT"
 
-		sleep 1;
+		read -s -n 1 -t 1 interrupt;
 		((SECONDS_LEFT--));
 	done
 	
@@ -55,7 +55,6 @@ while true; do
 	xdotool windowraise "$WINDOW_ID"
 	xdotool windowmap "$WINDOW_ID"
 
-	clear
 
 	choice=""
 
@@ -87,8 +86,9 @@ while true; do
 				1) 
 					clear; 
 					START_TIME=$SECONDS;
+					SECONDS_LEFT=$((MINUTES * 60))
 					choice=""; 
-					continue;;
+					break;;
 				2) 
 					clear; 
 					exit 0;;
