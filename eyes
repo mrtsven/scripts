@@ -1,5 +1,11 @@
 #!/bin/bash
 
+# cursor invisible
+tput civis
+
+# cursor normal if we exit
+trap "tput cnorm; exit" EXIT SIGINT SIGTERM
+
 if [ -z "$1" ]; then
 	echo "Usage: eyes <minutes>";
 	exit 1;
@@ -37,7 +43,6 @@ while true; do
 		V_CENTER=$(( (LINES - 7) / 2 ));
 		
 		tput cup $V_CENTER 0
-		clear;
 
 		center_text "TIME REMAINING:"
 
@@ -48,6 +53,7 @@ while true; do
 
 		read -s -n 1 -t 1 interrupt;
 		((SECONDS_LEFT--));
+		tput cup 0 0;
 	done
 	
 
