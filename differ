@@ -7,7 +7,7 @@ blue=$(tput setaf 4)
 yellow=$(tput setaf 3)
 cyan=$(tput setaf 6)
 
-REPOS=("waiter" "backoffice" "api" "shared" "shared-client" "cron" "consumer")
+REPOS=("waiter" "backoffice" "api" "shared" "shared-client" "cron" "consumer" "reports")
 
 REPO=""
 SOURCE=""
