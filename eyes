@@ -7,103 +7,101 @@ tput civis
 trap "tput cnorm; exit" EXIT SIGINT SIGTERM
 
 if [ -z "$1" ]; then
-	echo "Usage: eyes <minutes>";
-	exit 1;
+  echo "Usage: eyes <minutes>"
+  exit 1
 fi
 
-MINUTES=$1;
+MINUTES=$1
 
-WINDOW_ID=$(xdotool getactivewindow);
+WINDOW_ID=$(kdotool getactivewindow)
 
 center_text() {
-	local text="$1"
-	local terminal_width=$(tput cols)
-	local text_width=${#text}
-	local padding=$(( ( terminal_width - text_width ) / 2 ))
+  local text="$1"
+  local terminal_width=$(tput cols)
+  local text_width=${#text}
+  local padding=$(((terminal_width - text_width) / 2))
 
-	if [ $padding -gt 0 ]; then
-		printf "%${padding}s%s\n" "" "$text"
-	else
-		echo "$text"
-	fi
+  if [ $padding -gt 0 ]; then
+    printf "%${padding}s%s\n" "" "$text"
+  else
+    echo "$text"
+  fi
 }
 
 while true; do
-	echo "Timer started for $MINUTES minute(s)."
+  echo "Timer started for $MINUTES minute(s)."
 
-	SECONDS_LEFT=$((MINUTES * 60));
+  SECONDS_LEFT=$((MINUTES * 60))
 
-	while [ $SECONDS_LEFT -gt 0 ]; do
-		M=$((SECONDS_LEFT / 60));
-		S=$((SECONDS_LEFT % 60));
+  while [ $SECONDS_LEFT -gt 0 ]; do
+    M=$((SECONDS_LEFT / 60))
+    S=$((SECONDS_LEFT % 60))
 
-		TIME_STRING=$(printf "\r%02d:%02d " "$M" "$S");
+    TIME_STRING=$(printf "\r%02d:%02d " "$M" "$S")
 
-		LINES=$(tput lines);
-		V_CENTER=$(( (LINES - 7) / 2 ));
-		
-		tput cup $V_CENTER 0
+    LINES=$(tput lines)
+    V_CENTER=$(((LINES - 7) / 2))
 
-		center_text "TIME REMAINING:"
+    tput cup $V_CENTER 0
 
-		FIG_OUT=$(figlet -f slant "$TIME_STRING")
-		while IFS= read -r line; do
-			center_text "$line"
-		done <<< "$FIG_OUT"
+    center_text "TIME REMAINING:"
 
-		read -s -n 1 -t 1 interrupt;
-		((SECONDS_LEFT--));
-		tput cup 0 0;
-	done
-	
+    FIG_OUT=$(figlet -f slant "$TIME_STRING")
+    while IFS= read -r line; do
+      center_text "$line"
+    done <<<"$FIG_OUT"
 
-	xdotool windowactivate --sync "$WINDOW_ID"
-	xdotool windowraise "$WINDOW_ID"
-	xdotool windowmap "$WINDOW_ID"
+    read -s -n 1 -t 1 interrupt
+    ((SECONDS_LEFT--))
+    tput cup 0 0
+  done
 
+  kdotool windowactivate --sync "$WINDOW_ID"
+  kdotool windowraise "$WINDOW_ID"
+  kdotool windowmap "$WINDOW_ID"
 
-	choice=""
+  choice=""
 
-	START_TIME=$SECONDS;
+  START_TIME=$SECONDS
 
-	while [ -z "$choice" ]; do
+  while [ -z "$choice" ]; do
 
-		CURRENT_TOTAL=$(( SECONDS - START_TIME ))
-		SE=$(( CURRENT_TOTAL % 60))
-		MI=$(( CURRENT_TOTAL / 60))
-		COUNT_STRING=$(printf "\r%02d:%02d " "$MI" "$SE")
+    CURRENT_TOTAL=$((SECONDS - START_TIME))
+    SE=$((CURRENT_TOTAL % 60))
+    MI=$((CURRENT_TOTAL / 60))
+    COUNT_STRING=$(printf "\r%02d:%02d " "$MI" "$SE")
 
+    clear
+    echo "========="
+    echo "$COUNT_STRING"
+    echo "========="
 
-		clear;
-		echo "========="
-		echo "$COUNT_STRING"
-		echo "========="
+    echo "1) Restart"
+    echo "2) Exit"
 
-		echo "1) Restart"
-		echo "2) Exit"
+    read -s -t 1 -n 1 input
 
+    if [ ! -z "$input" ]; then
+      choice=$input
 
-		read -s -t 1 -n 1 input;
-
-		if [ ! -z "$input" ]; then
-			choice=$input
-
-			case $choice in
-				1) 
-					clear; 
-					START_TIME=$SECONDS;
-					SECONDS_LEFT=$((MINUTES * 60))
-					choice=""; 
-					break;;
-				2) 
-					clear; 
-					exit 0;;
-				*) 
-					choice=""; 
-					clear; 
-					echo "?";;
-			esac
-		fi
-	done
+      case $choice in
+      1)
+        clear
+        START_TIME=$SECONDS
+        SECONDS_LEFT=$((MINUTES * 60))
+        choice=""
+        break
+        ;;
+      2)
+        clear
+        exit 0
+        ;;
+      *)
+        choice=""
+        clear
+        echo "?"
+        ;;
+      esac
+    fi
+  done
 done
-	
