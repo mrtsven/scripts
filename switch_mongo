@@ -1,0 +1,107 @@
+#!/bin/bash
+
+# PATH scripts run in a subprocess, so this cannot export into your shell by
+# itself. ~/.zshrc wraps it:
+#   switch_mongo() { export MONGO_URL="$(command switch_mongo "$@")" || return; }
+# UI goes to the terminal; the chosen URL is printed on stdout for that wrapper.
+
+if [ -z "${privateUrl:-}" ]; then
+  echo "Error: privateUrl is not set in this shell." >&2
+  exit 1
+fi
+
+if [ -z "${localUrl:-}" ]; then
+  echo "Error: localUrl is not set in this shell." >&2
+  exit 1
+fi
+
+# Live when MONGO_URL matches privateUrl; otherwise Local
+# (unset, empty, or equal to localUrl).
+if [ "${MONGO_URL:-}" = "$privateUrl" ]; then
+  SELECTED=Live
+else
+  SELECTED=Local
+fi
+
+_draw() {
+  printf '\nSelect MongoDB connection:\n\n' > /dev/tty
+  if [ "$SELECTED" = Live ]; then
+    printf '  (*) Live\n' > /dev/tty
+    printf '  ( ) Local\n' > /dev/tty
+  else
+    printf '  ( ) Live\n' > /dev/tty
+    printf '  (*) Local\n' > /dev/tty
+  fi
+  printf '\n↑/↓ or j/k to move, Enter to confirm, q to cancel\n' > /dev/tty
+}
+
+_clear_menu() {
+  printf '\033[7A\033[J' > /dev/tty
+}
+
+_toggle() {
+  if [ "$SELECTED" = Live ]; then
+    SELECTED=Local
+  else
+    SELECTED=Live
+  fi
+}
+
+_draw
+
+while true; do
+  IFS= read -r -s -n 1 key < /dev/tty || { printf '\n' > /dev/tty; exit 1; }
+
+  case "$key" in
+    $'\033')
+      IFS= read -r -s -n 2 -t 0.1 rest < /dev/tty || rest=""
+      case "$rest" in
+        '[A'|'[D'|'OA'|'OD')
+          _toggle
+          _clear_menu
+          _draw
+          ;;
+        '[B'|'[C'|'OB'|'OC')
+          _toggle
+          _clear_menu
+          _draw
+          ;;
+      esac
+      ;;
+    j|J|k|K)
+      _toggle
+      _clear_menu
+      _draw
+      ;;
+    1)
+      SELECTED=Live
+      _clear_menu
+      _draw
+      ;;
+    2)
+      SELECTED=Local
+      _clear_menu
+      _draw
+      ;;
+    ''|$'\n'|$'\r')
+      break
+      ;;
+    q|Q)
+      printf '\nCancelled.\n' > /dev/tty
+      exit 1
+      ;;
+  esac
+done
+
+printf '\n' > /dev/tty
+
+case "$SELECTED" in
+  Live)
+    printf 'MONGO_URL set to Live (privateUrl).\n' > /dev/tty
+    printf '%s\n' "$privateUrl"
+    ;;
+  Local)
+    printf 'MONGO_URL set to Local (localUrl).\n' > /dev/tty
+    printf '%s\n' "$localUrl"
+    ;;
+esac

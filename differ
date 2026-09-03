@@ -2,12 +2,13 @@
 
 bold=$(tput bold)
 normal=$(tput sgr0)
+red=$(tput setaf 1)
 green=$(tput setaf 2)
 blue=$(tput setaf 4)
 yellow=$(tput setaf 3)
 cyan=$(tput setaf 6)
 
-REPOS=("waiter" "backoffice" "api" "shared" "shared-client" "cron" "consumer" "reports")
+REPOS=("waiter" "backoffice" "api" "shared" "shared-client" "cron" "consumer" "reports" "skills")
 
 REPO=""
 SOURCE=""
@@ -18,23 +19,53 @@ OS_TYPE="$(uname -s)"
 URL=''
 
 COPY_MODE=false
+POSITIONAL=()
 
-function check_xclip() {
-    if command -v xclip >/dev/null 2>&1; then
-        echo "xclip is installed."
+function usage() {
+    cat <<EOF
+Usage: $(basename "$0") [-c] [--repo=<name>] [repo] [source] [dest]
+
+Build a Bitbucket branch-compare URL and open it in the browser (or copy it
+with -c). Any of repo/source/dest you provide on the command line are used
+as-is; whatever you leave out is asked for interactively.
+
+Options:
+  -c               Copy the URL to the clipboard instead of opening it
+  --repo=<name>    Repository to compare
+  -h, --help       Show this help message
+
+Positional arguments fill repo, then source, then dest, in that order:
+  $(basename "$0") waiter master feature/foo
+  $(basename "$0") -c --repo=api release/1.2 hotfix/1.2.1
+
+Available repositories:
+$(printf '  - %s\n' "${REPOS[@]}")
+EOF
+}
+
+function copy_to_clipboard() {
+    if [ -n "$WAYLAND_DISPLAY" ] && command -v wl-copy >/dev/null 2>&1; then
+        echo -n "$1" | wl-copy
+    elif command -v xclip >/dev/null 2>&1; then
+        echo -n "$1" | xclip -selection clipboard
+    elif command -v xsel >/dev/null 2>&1; then
+        echo -n "$1" | xsel --clipboard --input
     else
-        echo "xclip is not installed."
-        COPY_MODE=false
+        echo -e "${red}✘${normal} No clipboard tool found (tried wl-copy, xclip, xsel)."
+        echo "Install one for your session (e.g. 'wl-clipboard' on Wayland, 'xclip' or 'xsel' on X11)."
+        return 1
     fi
 }
 
-function check_xdg_open() {
+# Returns 0 and does nothing if xdg-open is available. Otherwise prints the
+# URL so the user can open it manually and returns 1.
+function ensure_xdg_open() {
     if command -v xdg-open >/dev/null 2>&1; then
-        echo "xdg-open is installed."
-    else
-        echo "xdg-open is not installed. Please install "xdg-utils" using your package manager and try again."
-        COPY_MODE=false
+        return 0
     fi
+    echo -e "${yellow}⚠${normal} xdg-open is not installed (package 'xdg-utils'). Open this URL manually:"
+    echo "  $URL"
+    return 1
 }
 
 function validate_repo() {
@@ -45,7 +76,7 @@ function validate_repo() {
         fi
     done
 
-    echo -e "${yellow}⚠ Invalid repo:${normal} '$input_repo'"
+    echo -e "${red}✘ Invalid repo:${normal} '$input_repo'"
     echo "Available repositories:"
     for r in "${REPOS[@]}"; do
         echo "  - $r"
@@ -53,70 +84,82 @@ function validate_repo() {
     exit 1
 }
 
+function build_url() {
+    echo "https://bitbucket.org/possys/${REPO}/branches/compare/${SOURCE}%0D${DEST}#diff"
+}
+
 # Parse command-line options
 while [[ $# -gt 0 ]]; do
-  case "$1" in
-    -c)
-      COPY_MODE=true
-      shift
-      ;;
-    --repo=*)
-      REPO="${1#*=}"
-      validate_repo "$REPO"
-      shift
-      ;;
-    -*)
-      echo "Unknown option: $1"
-      echo "Usage: $0 [-c] [--repo=<name>] [source] [dest]"
-      exit 1
-      ;;
-    *)
-      # Positional arguments (commits/branches)
-      if [[ -z "$SOURCE" ]]; then
-        SOURCE="$1"
-      elif [[ -z "$DEST" ]]; then
-        DEST="$1"
-      else
+    case "$1" in
+        -c)
+            COPY_MODE=true
+            shift
+            ;;
+        --repo=*)
+            REPO="${1#*=}"
+            validate_repo "$REPO"
+            shift
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        -*)
+            echo "Unknown option: $1"
+            usage
+            exit 1
+            ;;
+        *)
+            POSITIONAL+=("$1")
+            shift
+            ;;
+    esac
+done
+
+# Fill whichever of repo/source/dest weren't set via flags, in that order.
+for arg in "${POSITIONAL[@]}"; do
+    if [[ -z "$REPO" ]]; then
+        REPO="$arg"
+        validate_repo "$REPO"
+    elif [[ -z "$SOURCE" ]]; then
+        SOURCE="$arg"
+    elif [[ -z "$DEST" ]]; then
+        DEST="$arg"
+    else
         echo "Too many arguments."
-        echo "Usage: $0 [-c] [--repo=<name>] [source] [dest]"
+        usage
         exit 1
-      fi
-      shift
-      ;;
-  esac
+    fi
 done
 
 function end_message() {
+    echo -e "${bold}URL:${normal} ${blue}${URL}${normal}"
     if [ "$COPY_MODE" = true ]; then
         echo -e "${green}✔${normal} URL copied to clipboard."
     else
         echo -e "${green}✔${normal} Opening comparison in browser..."
     fi
 
-    exit 0;
+    exit 0
 }
 
 function determine_os() {
     case "$OS_TYPE" in
     Darwin)
-        if [ "$COPY_MODE" = true ]; then      
+        if [ "$COPY_MODE" = true ]; then
             echo -n "$URL" | pbcopy
         else
             open "$URL"
         fi
         ;;
     Linux)
-        # Check if running under WSL
-        if grep -qi microsoft /proc/version; then
-        explorer.exe "$URL"
-        else
-            if [ "$COPY_MODE" = true ]; then
-                check_xclip
-                echo -n "$URL" | xclip -selection clipboard
-            else
-                check_xdg_open
-                xdg-open "$URL"
-            fi
+        if grep -qi microsoft /proc/version 2>/dev/null; then
+            # Running under WSL
+            explorer.exe "$URL"
+        elif [ "$COPY_MODE" = true ]; then
+            copy_to_clipboard "$URL"
+        elif ensure_xdg_open; then
+            xdg-open "$URL" >/dev/null 2>&1 &
         fi
         ;;
     CYGWIN*|MINGW*|MSYS*)
@@ -128,9 +171,7 @@ function determine_os() {
     esac
 }
 
-
-
-# Function to render the current status line
+# Renders the current step's status line
 function render_status() {
     clear
     echo -e "${bold}Repo:${normal} '${cyan}${REPO}${normal}' | ${bold}Source:${normal} '${cyan}${SOURCE}${normal}' | ${bold}Dest:${normal} '${cyan}${DEST}${normal}'"
@@ -138,11 +179,20 @@ function render_status() {
     echo ""
 }
 
-# Fast mode: if repo + source + dest are all set, skip interactive mode
+# Fast mode: if repo + source + dest are all set (via flags/args), skip the interactive prompts
 if [[ -n "$REPO" && -n "$SOURCE" && -n "$DEST" ]]; then
-    URL="https://bitbucket.org/possys/${REPO}/branches/compare/${SOURCE}%0D${DEST}#diff"
+    URL="$(build_url)"
     determine_os
     end_message
+fi
+
+# Jump straight to the first step that's still missing input
+if [[ -z "$REPO" ]]; then
+    STEP=1
+elif [[ -z "$SOURCE" ]]; then
+    STEP=2
+else
+    STEP=3
 fi
 
 while true; do
@@ -151,10 +201,9 @@ while true; do
     case $STEP in
         1) # Step 1: Select Repo
             echo "Select a repository:"
-            select CHOICE in "${REPOS[@]}" "Back"; do
-                if [[ "$REPLY" -eq $((${#REPOS[@]} + 1)) ]]; then
-                    echo -e "${red}You're already at the first step.${normal}"
-                elif [[ -n "$CHOICE" ]]; then
+            PS3="Enter a number: "
+            select CHOICE in "${REPOS[@]}"; do
+                if [[ -n "$CHOICE" ]]; then
                     REPO="$CHOICE"
                     STEP=2
                     break
@@ -164,7 +213,7 @@ while true; do
             done
             ;;
         2) # Step 2: Enter Source
-            read -p "Enter source branch (or type 'b' to go back): " input
+            read -rp "Enter source branch (or type 'b' to go back): " input
             if [[ "$input" == "b" ]]; then
                 REPO=""
                 STEP=1
@@ -174,7 +223,7 @@ while true; do
             fi
             ;;
         3) # Step 3: Enter Dest
-            read -p "Enter destination branch (or type 'b' to go back): " input
+            read -rp "Enter destination branch (or type 'b' to go back): " input
             if [[ "$input" == "b" ]]; then
                 SOURCE=""
                 STEP=2
@@ -183,13 +232,10 @@ while true; do
                 STEP=4
             fi
             ;;
-        4) # Final step: Confirm and open
-            URL="https://bitbucket.org/possys/${REPO}/branches/compare/${SOURCE}%0D${DEST}#diff"
-
+        4) # Final step: build the URL and open/copy it
+            URL="$(build_url)"
             determine_os
             end_message
-            break
             ;;
     esac
 done
-
